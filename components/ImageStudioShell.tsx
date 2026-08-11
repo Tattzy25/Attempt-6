@@ -27,12 +27,12 @@ export const ImageStudioShell: React.FC = () => {
   });
 
   const [outputCount, setOutputCount] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('output') || params.get('count') || '';
-    }
-    return '';
-  });
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('output') || params.get('count') || '4';
+  }
+  return '4';
+});
 
   const [creditCostPerOutput, setCreditCostPerOutput] = useState<number>(() => {
     if (typeof window !== 'undefined') {
