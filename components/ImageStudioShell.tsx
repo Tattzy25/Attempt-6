@@ -6,16 +6,16 @@ import { Sparkles, Wand2, RefreshCw, Layers, History, Image as ImageIcon, Slider
 import { DropzoneThumbnail } from './DropzoneThumbnail';
 import { OutputGrid, GeneratedImageItem } from './OutputGrid';
 import { LightboxModal } from './LightboxModal';
-import { Toast } from './Toast';
+import { Toast, extractCallMessage } from './Toast';
 
 export const ImageStudioShell: React.FC = () => {
   // Configuration State
   const [customerId, setCustomerId] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('customer_id') || params.get('id') || params.get('customer') || '8918949199947';
+      return params.get('customer_id') || params.get('id') || params.get('customer') || '';
     }
-    return '8918949199947';
+    return '';
   });
 
   const [sourceId, setSourceId] = useState(() => {
@@ -29,9 +29,9 @@ export const ImageStudioShell: React.FC = () => {
   const [outputCount, setOutputCount] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('output') || params.get('count') || '4';
+      return params.get('output') || params.get('count') || '';
     }
-    return '4';
+    return '';
   });
 
   const [creditCostPerOutput, setCreditCostPerOutput] = useState<number>(() => {
@@ -42,7 +42,7 @@ export const ImageStudioShell: React.FC = () => {
         return Number(paramCost);
       }
     }
-    return 1;
+    return 0;
   });
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -125,7 +125,6 @@ export const ImageStudioShell: React.FC = () => {
   // Convert uploaded image to convert.tattty.com URL
   const handleConvertImage = async (fileOrBase64: File | string) => {
     setIsConverting(true);
-    showToast('Converting reference image via convert.tattty.com...', 'info');
 
     try {
       let base64String = '';
@@ -160,18 +159,28 @@ export const ImageStudioShell: React.FC = () => {
 
       if (data && data.url) {
         setImage1(data.url);
-        showToast('Source image converted & set as image1!', 'success');
+        // Show exactly what the convert call sent back (any message field, otherwise the returned url itself)
+        showToast(extractCallMessage(data) ?? data.url, 'success');
       } else if (typeof data === 'string' && data.startsWith('http')) {
         setImage1(data);
-        showToast('Source image set successfully!', 'success');
+        // The response itself is the url — show it as-is
+        showToast(data, 'success');
       } else {
         // Fallback: use data URI if convert endpoint failed to return url
         setImage1(base64String);
-        showToast('Image converted locally as fallback', 'info');
+        // Surface whatever the call actually returned. Nothing displayable means nothing shown
+        const returnedMessage = extractCallMessage(data);
+        if (returnedMessage) {
+          showToast(returnedMessage, res.ok ? 'info' : 'error');
+        }
       }
     } catch (err: unknown) {
       console.error('Convert Error:', err);
-      showToast('Image upload failed. Try again.', 'error');
+      // Surface what came back from the failed call. Nothing displayable means nothing shown
+      const returnedError = extractCallMessage(err);
+      if (returnedError) {
+        showToast(returnedError, 'error');
+      }
     } finally {
       setIsConverting(false);
     }
@@ -182,7 +191,6 @@ export const ImageStudioShell: React.FC = () => {
     if (e) e.preventDefault();
 
     setIsGenerating(true);
-    showToast('Executing worker request...', 'info');
 
     // Build exact payload
     const payload = {
@@ -205,6 +213,13 @@ export const ImageStudioShell: React.FC = () => {
       });
 
       const data = await res.json();
+      const returnedMessage = extractCallMessage(data);
+
+      // Non-OK response: surface exactly what the call sent back
+      if (!res.ok) {
+        showToast(returnedMessage ?? `HTTP ${res.status}`, 'error');
+        return;
+      }
 
       // Dynamic Extraction of Image URLs from Response Object
       const extractedImages: GeneratedImageItem[] = [];
@@ -253,15 +268,22 @@ export const ImageStudioShell: React.FC = () => {
 
       if (extractedImages.length > 0) {
         setResults(extractedImages);
-        showToast(`Received ${extractedImages.length} output design(s)!`, 'success');
-      } else {
-        // Raw output display if non-standard keys returned
-        showToast('Worker response received with no direct image keys.', 'info');
+        // Prefer the message returned by the worker. Otherwise surface the count derived from the response
+        showToast(
+          returnedMessage ?? `${extractedImages.length} output design(s)`,
+          'success'
+        );
+      } else if (returnedMessage) {
+        // No image keys came back — show whatever the response did return
+        showToast(returnedMessage, 'info');
       }
     } catch (err: unknown) {
       console.error('Worker Call Error:', err);
-      const errMsg = err instanceof Error ? err.message : 'Worker call failed';
-      showToast(`Worker error: ${errMsg}`, 'error');
+      // Surface what came back from the failed call. Nothing displayable means nothing shown
+      const returnedError = extractCallMessage(err);
+      if (returnedError) {
+        showToast(returnedError, 'error');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -270,7 +292,6 @@ export const ImageStudioShell: React.FC = () => {
   // Jump generated image right back into the dropzone thumbnail for editing!
   const handleEditThis = (url: string) => {
     setImage1(url);
-    showToast('Image set as source reference! Type your next prompt to edit.', 'success');
 
     // Smooth focus back to prompt input
     topRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -428,7 +449,6 @@ export const ImageStudioShell: React.FC = () => {
           onConvertImage={handleConvertImage}
           onClearImage={() => {
             setImage1(null);
-            showToast('Cleared reference image', 'info');
           }}
           onError={(msg) => showToast(msg, 'error')}
         />
@@ -467,8 +487,13 @@ export const ImageStudioShell: React.FC = () => {
         onClose={() => setSelectedLightboxUrl(null)}
         onEditThis={handleEditThis}
         onCopyUrl={(url) => {
-          navigator.clipboard.writeText(url);
-          showToast('Image URL copied!', 'success');
+          // Clipboard success resolves with nothing displayable — only surface what comes back if the call fails
+          navigator.clipboard.writeText(url).catch((err: unknown) => {
+            const returnedError = extractCallMessage(err);
+            if (returnedError) {
+              showToast(returnedError, 'error');
+            }
+          });
         }}
         onDownload={async (url) => {
           try {
@@ -482,9 +507,14 @@ export const ImageStudioShell: React.FC = () => {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(blobUrl);
-            showToast('Download started!', 'success');
-          } catch {
+            // Surface the resource that came back from the call
+            showToast(url, 'success');
+          } catch (err: unknown) {
             window.open(url, '_blank');
+            const returnedError = extractCallMessage(err);
+            if (returnedError) {
+              showToast(returnedError, 'error');
+            }
           }
         }}
       />

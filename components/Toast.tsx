@@ -66,3 +66,36 @@ export const Toast: React.FC<ToastProps> = ({
     </AnimatePresence>
   );
 };
+
+/**
+ * Extract a human-readable message from an error or arbitrary API response body.
+ * Used to surface backend messages consistently across the UI.
+ */
+export function extractCallMessage(err: unknown): string | null {
+  if (!err) return null;
+  if (typeof err === 'string') return err;
+  const obj = err as Record<string, unknown>;
+
+  // High-priority explicit message fields
+  const explicitMessage = obj?.message ?? obj?.msg ?? obj?.detail ?? obj?.error;
+  if (typeof explicitMessage === 'string' && explicitMessage.length > 0) {
+    return explicitMessage;
+  }
+
+  // Next attempt: any "description" field
+  if (typeof obj?.description === 'string' && obj.description.length > 0) {
+    return obj.description;
+  }
+
+  // Final fallback: try to JSON serialize the object itself
+  try {
+    const json = JSON.stringify(obj);
+    if (json.length > 3) {
+      return json;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}

@@ -1,5 +1,5 @@
 {
-  "name": "AI Image Studio Shell",
+  "name": "TaTTTy Gen",
   "description": "Real-time interactive shell and dynamic worker interface for natural language image editing and generation.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

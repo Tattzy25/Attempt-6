@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Share2, Sparkles, Maximize2, Check, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { extractCallMessage } from './Toast';
 
 export interface GeneratedImageItem {
   id: string;
@@ -43,11 +44,15 @@ export const OutputGrid: React.FC<OutputGridProps> = ({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
-      onShowToast('Download started!', 'success');
-    } catch {
+      // Surface the resource that came back from the call
+      onShowToast(item.url, 'success');
+    } catch (err: unknown) {
       // Direct fallback
       window.open(item.url, '_blank');
-      onShowToast('Opening image in new tab for download', 'info');
+      const returnedError = extractCallMessage(err);
+      if (returnedError) {
+        onShowToast(returnedError, 'error');
+      }
     }
   };
 
@@ -59,7 +64,7 @@ export const OutputGrid: React.FC<OutputGridProps> = ({
           text: item.prompt || 'Generated Tattoo Design',
           url: item.url,
         });
-        onShowToast('Shared design link!', 'success');
+        // navigator.share resolves with nothing displayable — nothing to show
         return;
       } catch {
         // Fallback to clipboard
