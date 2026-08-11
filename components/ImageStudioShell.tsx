@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Wand2, RefreshCw, Layers, History, Image as ImageIcon, Sliders, ChevronDown, Trash2, ArrowRight } from 'lucide-react';
+import { Sparkles, Wand2, RefreshCw, Layers, History, Image as ImageIcon, Sliders, ChevronDown, Trash2, ArrowRight, X } from 'lucide-react';
 import { DropzoneThumbnail } from './DropzoneThumbnail';
 import { OutputGrid, GeneratedImageItem } from './OutputGrid';
 import { LightboxModal } from './LightboxModal';
@@ -45,12 +45,20 @@ export const ImageStudioShell: React.FC = () => {
     return 1;
   });
 
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-      if (e.data && e.data.credit_cost_per_output !== undefined && e.data.credit_cost_per_output !== null) {
-        const cost = Number(e.data.credit_cost_per_output);
-        if (!isNaN(cost)) {
-          setCreditCostPerOutput(cost);
+      if (e.data) {
+        if (e.data.credit_cost_per_output !== undefined && e.data.credit_cost_per_output !== null) {
+          const cost = Number(e.data.credit_cost_per_output);
+          if (!isNaN(cost)) {
+            setCreditCostPerOutput(cost);
+          }
+        }
+        const newCustId = e.data.customer_id || e.data.customerId || e.data.customer;
+        if (newCustId && typeof newCustId === 'string' && newCustId.trim()) {
+          setCustomerId(newCustId.trim());
         }
       }
     };
@@ -284,19 +292,14 @@ export const ImageStudioShell: React.FC = () => {
     <div ref={topRef} className="w-full max-w-5xl mx-auto px-2.5 sm:px-4 py-3 sm:py-6 space-y-4">
       {/* Top Utility Bar */}
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-zinc-100">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-zinc-900 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-            <Wand2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div>
-            <h1 className="text-xs sm:text-sm font-bold text-zinc-900 leading-tight tracking-tight">
-              TaTTTy Real-Time AI Studio
-            </h1>
-            <p className="text-[10px] text-zinc-500 font-mono hidden xs:block">
-              ID: {customerId} &bull; Output: {outputCount}
-            </p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsGalleryOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer border border-zinc-800"
+        >
+          <ImageIcon className="w-4 h-4 text-emerald-400" />
+          <span>My Gallery</span>
+        </button>
       </div>
 
       {/* Main Interactive Studio Shell Card */}
@@ -492,6 +495,60 @@ export const ImageStudioShell: React.FC = () => {
         type={toast?.type}
         onClose={() => setToast(null)}
       />
+
+      {/* Full Screen Gallery Overlay */}
+      <AnimatePresence>
+        {isGalleryOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-2 sm:p-5"
+            onClick={() => setIsGalleryOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-5xl bg-zinc-900 rounded-3xl p-3 sm:p-5 border border-zinc-800 shadow-2xl flex flex-col space-y-3"
+            >
+              <div className="flex items-center justify-between px-1 text-white">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base font-bold text-white">My Gallery</h2>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      Customer ID: {customerId}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsGalleryOpen(false)}
+                  className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+                  aria-label="Close Gallery"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="w-full overflow-hidden rounded-2xl bg-white border border-zinc-800 shadow-inner">
+                <iframe
+                  src={`https://my-gallery.tattty.com/?customerId=${encodeURIComponent(customerId)}`}
+                  width="100%"
+                  height="700px"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-downloads allow-forms"
+                  className="w-full h-[700px] max-h-[75vh] border-0"
+                  title="My Gallery"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
