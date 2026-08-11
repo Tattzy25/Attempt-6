@@ -377,7 +377,7 @@ export const ImageStudioShell: React.FC = () => {
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Generate ({outputCount})</span>
+                      <span>Generate</span>
                     </>
                   )}
                 </button>
